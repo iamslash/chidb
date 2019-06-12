@@ -54,6 +54,7 @@
 #include "pager.h"
 #include "util.h"
 
+#include <sys/stat.h>
 
 /* Open a B-Tree file
  *
@@ -79,9 +80,64 @@
  */
 int chidb_Btree_open(const char *filename, chidb *db, BTree **bt)
 {
-    /* Your code goes here */
+  int          st;
+  Pager       *pager;
+  struct stat  fst;
+  npage_t      npage;
+  uint8_t      phdr[100];
+  uint16_t     pgsize;
 
-    return CHIDB_OK;
+  uint8_t h12[] = {0x01, 0x01, 0x00, 0x40, 0x20, 0x20};
+  uint8_t h0[]  = {0, 0, 0, 0};
+  uint8_t h1[]  = {0, 0, 0, 1};
+
+  if ((st = chidb_Pager_open(&pager, filename)) != CHIDB_OK) {
+    return st;
+  }
+
+  *bt = (BTree*)malloc(sizeof(BTree));
+  if (!(*bt)) {
+    return CHIDB_ENOMEM;
+  }
+
+  (*bt)->pager = pager;
+  (*bt)->db    = db;
+  db->bt       = *bt;
+
+  fstat(fileno(pager->f), &fst);
+
+  if (!fst.st_size) {
+    // make a new file
+    chidb_Pager_setPageSize(pager, DEFAULT_PAGE_SIZE);
+    pager->n_pages = 0;
+
+    if (st = chidb_Btree_newNode(*bt, &npage, PGTYPE_TABLE_LEAF)) {
+      return st;
+    }
+  } else {
+    // read a file
+    if (st = chidb_Pager_readHeader(pager, phdr)) {
+      return st;
+    }
+
+    // check page head
+    if (memcmp(phdr, "SQLite format 3", 16) ||
+        memcmp(&phdr[0x12], h12, 6)         ||
+        memcmp(&phdr[0x20], h0, 4)          ||
+        memcmp(&phdr[0x24], h0, 4)          ||
+        memcmp(&phdr[0x2c], h1, 4)          ||
+        memcmp(&phdr[0x34], h0, 4)          ||
+        memcmp(&phdr[0x38], h1, 4)          ||
+        memcmp(&phdr[0x40], h0, 4)          ||
+        (get4byte(&phdr[0x30]) == 20000)) {
+      return CHIDB_ECORRUPTHEADER;
+    }
+
+    pgsize = get2byte(&phdr[0x10]);
+    chidb_Pager_setPageSize(pager, pgsize);
+  }
+
+  return CHIDB_OK;
 }
 
 
@@ -99,7 +155,8 @@ int chidb_Btree_open(const char *filename, chidb *db, BTree **bt)
  */
 int chidb_Btree_close(BTree *bt)
 {
-    /* Your code goes here */
+    chidb_Pager_close(bt->pager);
+    free(bt);
 
     return CHIDB_OK;
 }
@@ -173,9 +230,15 @@ int chidb_Btree_freeMemNode(BTree *bt, BTreeNode *btn)
  */
 int chidb_Btree_newNode(BTree *bt, npage_t *npage, uint8_t type)
 {
-    /* Your code goes here */
+    int st;
+    
+    if (st = chidb_Pager_allocatePage(bt->pager, npage)) {
+      return st;
+    }    
+    
+    st = chidb_Btree_initEmptyNode(bt, *npage, type);
 
-    return CHIDB_OK;
+    return st;
 }
 
 
