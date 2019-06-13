@@ -2,3 +2,13 @@ chidb - A didactic RDBMS
 =====================================
 
 The chidb documentation is available at http://chi.cs.uchicago.edu/
+
+ToDo
+====
+
+* //src/libchidb/btree.c
+* src/libchidb/api.c
+* src/libchidb/dbm-cursor.c
+* src/libchidb/dbm-cursor.h
+* src/libchidb/dbm-ops.c
+* src/libchidb/optimizer.c
