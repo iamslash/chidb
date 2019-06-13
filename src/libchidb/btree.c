@@ -895,11 +895,129 @@ int chidb_Btree_insert(BTree *bt, npage_t nroot, BTreeCell *btc)
  */
 int chidb_Btree_insertNonFull(BTree *bt, npage_t npage, BTreeCell *btc)
 {
-    /* Your code goes here */
+  BTreeNode *ubtn;
+  BTreeNode *cbtn;
+  BTreeCell tcell;
+  int i, st;
+  npage_t npage_cbtn, npage_tbtn;
 
-    return CHIDB_OK;
+  if(!npage) {
+    chilog(CRITICAL, "insertNonFull: npage is 0.\n");
+    exit(1);
+  }
+
+  if (st = chidb_Btree_getNodeByPage(bt, npage, &ubtn)) {
+      return st;
+  }
+
+  for (i = 0; i < ubtn->n_cells; i++) {
+
+    // check no cell
+    if (chidb_Btree_getCell(ubtn, i, &tcell)) {
+      fprintf(stderr,"insertNonFull: invalid cell, no(%d)\n",i);
+      return CHIDB_ECELLNO;
+    }
+
+    // check already have
+    if ((tcell.key == btc->key) && (ubtn->type != PGTYPE_TABLE_INTERNAL)) {
+      if (st = chidb_Btree_freeMemNode(bt, ubtn)) {
+        return st;
+      }
+      return CHIDB_EDUPLICATE;
+    }
+
+    if (btc->key <= tcell.key) {
+
+      switch(ubtn->type) {
+        
+        case PGTYPE_TABLE_INTERNAL:
+
+          if (st = chidb_Btree_freeMemNode(bt, ubtn)) {
+            return st;
+          }
+
+          if (st = chidb_Btree_getNodeByPage(bt, tcell.fields.tableInternal.child_page, 
+              &cbtn)) {
+            return st;
+          }
+
+          if (!notEnoughSpace(cbtn, btc)) {
+            
+            if (st = chidb_Btree_freeMemNode(bt, cbtn)) {
+              return st;
+            }
+            if (st = chidb_Btree_split(bt, npage, tcell.fields.tableInternal.child_page, 
+                i, &npage_cbtn)) {
+              return st;
+            }
+            return chidb_Btree_insertNonFull(bt, npage, btc);
+          }
+
+          return chidb_Btree_insertNonFull(bt, tcell.fields.tableInternal.child_page, btc);
+
+        case PGTYPE_INDEX_INTERNAL:   
+
+          if (st = chidb_Btree_freeMemNode(bt, ubtn)) {
+            return st;
+          }
+
+          if (st = chidb_Btree_getNodeByPage(bt, tcell.fields.indexInternal.child_page, 
+              &cbtn)) {
+            return st;
+          }
+
+          if (!notEnoughSpace(cbtn, btc)) {
+            
+            if (st = chidb_Btree_freeMemNode(bt, cbtn)) {
+              return st;
+            }
+            if (st = chidb_Btree_split(bt, npage, tcell.fields.indexInternal.child_page, 
+                i, &npage_cbtn)) {
+              return st;
+            }
+            return chidb_Btree_insertNonFull(bt, npage, btc);
+          }
+
+          return chidb_Btree_insertNonFull(bt, tcell.fields.indexInternal.child_page, btc); 
+            
+        case PGTYPE_TABLE_LEAF:
+        case PGTYPE_INDEX_LEAF:
+          st = chidb_Btree_insertCell(ubtn, i, btc);
+          chidb_Btree_writeNode(bt, ubtn);
+          chidb_Btree_freeMemNode(bt, ubtn);
+          return st;
+      }
+    }
+  } // end for (i = 0; i < ubtn->n_cells; i++)
+
+  if ((ubtn->type == PGTYPE_INDEX_LEAF) || (ubtn->type == PGTYPE_TABLE_LEAF)) {
+    st = chidb_Btree_insertCell(ubtn, i, btc);
+    chidb_Btree_writeNode(bt, ubtn);
+    chidb_Btree_freeMemNode(bt, ubtn);
+    return st;
+  }
+
+  npage_tbtn = ubtn->right_page;
+
+  chidb_Btree_freeMemNode(bt, ubtn);
+
+  if (st = chidb_Btree_getNodeByPage(bt, npage_tbtn, &cbtn)) {
+      return st;
+  }
+
+  if (!notEnoughSpace(cbtn, btc)) {
+    
+    if (st = chidb_Btree_freeMemNode(bt, cbtn)) {
+      return st;
+    }
+    if (st = chidb_Btree_split(bt, npage, npage_tbtn, i, &npage_cbtn)) {
+        return st;
+    }
+    return chidb_Btree_insertNonFull(bt, npage, btc);
+  }
+
+  return chidb_Btree_insertNonFull(bt, npage_tbtn, btc);
 }
-
 
 /* Split a B-Tree node
  *
@@ -926,8 +1044,197 @@ int chidb_Btree_insertNonFull(BTree *bt, npage_t npage, BTreeCell *btc)
  */
 int chidb_Btree_split(BTree *bt, npage_t npage_parent, npage_t npage_child, ncell_t parent_ncell, npage_t *npage_child2)
 {
-    /* Your code goes here */
+  BTreeNode *pbtn;
+  BTreeNode *cbtn;
 
-    return CHIDB_OK;
+  BTreeNode *ubtn;
+  npage_t npage_ubtn;
+
+  BTreeNode *vbtn;
+  npage_t npage_vbtn, npage_uright;
+
+  BTreeNode *tbtn;
+  npage_t npage_tbtn;
+
+  BTreeCell ncell;  // inserted cell
+  BTreeCell ucell;  // original cell
+  BTreeCell tcell;  // temp cell
+
+  int i, j, st, midx;  // midx: median index
+
+  // get parent page
+  if (st = chidb_Btree_getNodeByPage(bt, npage_parent, &pbtn)) {
+    return st;
+  }
+
+  // get child page
+  if (st = chidb_Btree_getNodeByPage(bt, npage_child, &cbtn)) {
+    return st;
+  }
+
+  // set median index
+  midx = cbtn->n_cells / 2;
+
+  // initialize new node with page_num = npage_vbtn
+  if (st = chidb_Btree_newNode(bt, &npage_vbtn, cbtn->type)) {
+    return st;
+  }
+
+  // get page at page_num = npage_vbtn
+  if (st = chidb_Btree_getNodeByPage(bt, npage_vbtn, &vbtn)) {
+    return st;
+  }
+
+  ubtn = cbtn;
+  npage_ubtn = npage_child;
+
+  // initialize new node with page_num = npage_tbtn
+  if (st = chidb_Btree_newNode(bt, &npage_tbtn, cbtn->type)) {
+    return st;
+  }
+
+  // get page at page_num = npage_tbtn
+  if (st = chidb_Btree_getNodeByPage(bt, npage_tbtn, &tbtn)) {
+    return st;
+  }
+
+  // Setup ncell for insertion into parent
+  if ((st = chidb_Btree_getCell(cbtn, midx, &ucell)) != CHIDB_OK) {
+    return st;
+  }
+
+  ncell.type = pbtn->type;
+  ncell.key = ucell.key;
+
+  switch(ncell.type) {
+    case PGTYPE_TABLE_INTERNAL:
+      ncell.fields.tableInternal.child_page = npage_vbtn;
+      break;
+
+    case PGTYPE_INDEX_INTERNAL:
+      ncell.fields.indexInternal.child_page = npage_vbtn;
+
+      if (ucell.type == PGTYPE_INDEX_INTERNAL) {
+          ncell.fields.indexInternal.keyPk = ucell.fields.indexInternal.keyPk;
+      } else {
+          ncell.fields.indexInternal.keyPk = ucell.fields.indexLeaf.keyPk;
+      }
+    break;
+      default:
+    chilog(CRITICAL, "split: type of parent should never be a leaf type; got type (%d)\n", ncell.type);
+    exit(1);
+  }
+
+  // Insert ncell into pbtn
+  if (st = chidb_Btree_insertCell(st, parent_ncell, &ncell)) {
+    chilog(CRITICAL, "split: median cell insert into parent error (%d)\n", st);
+    return st;
+  }
+
+  //copy cells below the median to vbtn
+  for (i = 0; i < midx; i++) {
+    if (st = chidb_Btree_getCell(ubtn, i, &tcell)) {
+      return st;
+    }
+    if (st = chidb_Btree_insertCell(vbtn, i, &tcell)) {
+      return st;
+    }
+  }
+
+  // copy original median cell if necessary
+  // get that original median cell into tcell
+  if (st = chidb_Btree_getCell(ubtn, i, &tcell)) {
+    return st;
+  }	
+
+  if (ubtn->type == PGTYPE_TABLE_LEAF) {
+    if (st = chidb_Btree_insertCell(vbtn, i, &tcell)) {
+      return st;
+    }
+    i++;
+  } else if (tcell.type != PGTYPE_INDEX_LEAF) {
+    // if the type of the children is not a leaf type, then we must set right_page of vbtn to the former child of the median
+    switch(tcell.type) {
+      case PGTYPE_TABLE_INTERNAL:
+        vbtn->right_page = tcell.fields.tableInternal.child_page;
+        break;
+      case PGTYPE_INDEX_INTERNAL:
+        vbtn->right_page = tcell.fields.indexInternal.child_page;
+        break;
+    }
+
+    if(vbtn->right_page == 0) {
+      chilog(CRITICAL, "split: 0 right page passed\n");
+      exit(2);
+    }
+  }
+
+  // copy cells above the median to tbtn
+  for (j = 0; i < cbtn->n_cells; i++, j++) {
+    if (st = chidb_Btree_getCell(cbtn, i, &tcell)) {
+      return st;
+    }
+    if (st = chidb_Btree_insertCell(tbtn, j, &tcell)) {
+      return st;
+    }        
+  }
+
+  npage_uright = cbtn->right_page;
+  // close cbtn
+
+  if (st = chidb_Btree_freeMemNode(bt,cbtn)) {
+    return st;
+  }
+
+  // clear upper
+  if (st = chidb_Btree_initEmptyNode(bt, npage_ubtn, tbtn->type)) {
+    return st;
+  }
+
+  // reopen upper
+  if (st = chidb_Btree_getNodeByPage(bt, npage_ubtn, &cbtn)) {
+    return st;
+  }
+
+  ubtn->right_page = npage_uright;
+
+  // insert each cell in tbtn into upper
+  for (i = 0; i < tbtn->n_cells; i++) {
+    if (st = chidb_Btree_getCell(tbtn, i, &tcell)) {
+      return st;
+    }
+    if (st = chidb_Btree_insertCell(ubtn, i, &tcell)) {
+      return st;
+    }           
+  }
+
+  // free tbtn
+  // decrement number of pages (like it was never here)
+  chidb_Btree_freeMemNode(bt, tbtn);
+  bt->pager->n_pages--;
+
+  // write pbtn
+  if (st = chidb_Btree_writeNode(bt, pbtn)) {
+    return st;
+  }
+
+  // write upper
+  if (st = chidb_Btree_writeNode(bt, ubtn)) {
+    return st;
+  }
+
+  // write vbtn
+  if (st = chidb_Btree_writeNode(bt, vbtn)) {
+    return st;
+  }
+
+  // set out parameter to page number of child node
+  *npage_child2 = npage_vbtn;
+
+  //free in-memory nodes
+  chidb_Btree_freeMemNode(bt, pbtn);
+  chidb_Btree_freeMemNode(bt, ubtn);
+  chidb_Btree_freeMemNode(bt, vbtn);
+
+  return CHIDB_OK;
 }
-

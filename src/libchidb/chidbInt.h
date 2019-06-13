@@ -49,6 +49,7 @@
 #include <assert.h>
 #include <string.h>
 #include <chidb/chidb.h>
+#include "../simclist/simclist.h"
 
 // Private codes (shouldn't be used by API users)
 #define CHIDB_NOHEADER (1)
@@ -73,8 +74,15 @@ typedef uint32_t chidb_key_t;
 /* Forward declaration */
 typedef struct BTree BTree;
 
-
-  /* code */
+/* schema */
+typedef struct chidb_sql_schema
+{
+  char *type;
+  char *name;
+  char *assoc;
+  int rpage;
+  chisql_statement_t *stmt;
+} chidb_sql_schema_t;
 
 /* A chidb database is initially only a BTree.
  * This presuposes that only the btree.c module has been implemented.
@@ -84,6 +92,8 @@ typedef struct BTree BTree;
 struct chidb
 {
     BTree   *bt;
+    list_t schemas;
+    int need_refresh;
 };
 
 #endif /*CHIDBINT_H_*/
