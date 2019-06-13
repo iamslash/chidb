@@ -12,3 +12,4 @@ ToDo
 * src/libchidb/dbm-cursor.h
 * src/libchidb/dbm-ops.c
 * src/libchidb/optimizer.c
+* src/libchidb/codegen.c
