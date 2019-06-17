@@ -10,16 +10,15 @@ ToDo
 * //src/libchidb/btree.c
 * //src/libchidb/btree.h
 * //src/libchidb/chidbint.h
-* src/libchidb/codegen.c
-* src/libchidb/dbm-cursor.c
-* src/libchidb/dbm-cursor.h
-* src/libchidb/dbm-ops.c
-* src/libchidb/dbm-types.h
 * //src/libchidb/dbm.c
 * //src/libchidb/dbm.h
-* src/libchidb/optimizer.c
 * //src/libchidb/util.c
 * //src/libchidb/util.h
+* src/libchidb/dbm-cursor.c
+* src/libchidb/dbm-cursor.h
+* src/libchidb/codegen.c
+* src/libchidb/dbm-ops.c
+* src/libchidb/optimizer.c
 
 * src/libchisql/sql.y
 
