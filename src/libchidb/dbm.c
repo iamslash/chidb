@@ -129,6 +129,12 @@ int chidb_stmt_free(chidb_stmt *stmt)
 	free(stmt->reg);
 	free(stmt->cursors);
     return CHIDB_OK;
+
+	free(stmt->ops);
+    free_reg(stmt);
+	free(stmt->cursors);
+    free(stmt);
+    return CHIDB_OK;    
 }
 
 
@@ -208,7 +214,8 @@ int chidb_stmt_exec(chidb_stmt *stmt)
             break;
     }
 
-    assert(stmt->nRR == stmt->nCols);
+    if (rc==CHIDB_ROW)
+        assert(stmt->nRR == stmt->nCols);
 
     if (rc == CHIDB_OK || rc == CHIDB_DONE)
         rc = CHIDB_DONE;
@@ -414,3 +421,27 @@ int realloc_cur(chidb_stmt *stmt, uint32_t size)
     return CHIDB_OK;
 }
 
+// free registers of stmt
+void free_reg(chidb_stmt *stmt)
+{
+    chidb_dbm_register_t reg;
+
+    for (int i = stmt->nReg; i > 0; i--)
+    {
+        reg = stmt->reg[i-1];
+        switch (reg.type)
+        {
+            case REG_STRING:
+                free(reg.value.s);
+                break;
+
+            case REG_BINARY:
+                free(reg.value.bin.bytes);
+
+            case REG_UNSPECIFIED:
+            case REG_NULL:
+            case REG_INT32:
+                break;
+        }
+    }
+}

@@ -15,8 +15,8 @@ ToDo
 * src/libchidb/dbm-cursor.h
 * src/libchidb/dbm-ops.c
 * src/libchidb/dbm-types.h
-* src/libchidb/dbm.c
-* src/libchidb/dbm.h
+* //src/libchidb/dbm.c
+* //src/libchidb/dbm.h
 * src/libchidb/optimizer.c
 * //src/libchidb/util.c
 * //src/libchidb/util.h
