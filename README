@@ -23,6 +23,6 @@ ToDo
 
 * src/libchisql/sql.y
 
-* src/shell/commands.c
-* src/shell/commands.h
+* //src/shell/commands.c
+* //src/shell/commands.h
 * //src/shell/main.c
