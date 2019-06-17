@@ -17,7 +17,7 @@
 #include <chidb/log.h>
 #include "shell.h"
 #include "commands.h"
-
+#include "../libchidb/chidbInt.h"
 
 char *prompt(EditLine *e)
 {

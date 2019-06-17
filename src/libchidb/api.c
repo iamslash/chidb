@@ -120,23 +120,24 @@ int load_schema(chidb *db, npage_t nroot)
 
 int chidb_open(const char *file, chidb **db)
 {
-    *db = malloc(sizeof(chidb));
-    if (*db == NULL)
-      return CHIDB_ENOMEM;
+	int rc;
+	*db = malloc(sizeof(chidb));
+	if (*db == NULL)
+		return CHIDB_ENOMEM;
 
-    if (st = chidb_Btree_open(file, *db, &(*db)->bt))
-	    return st;
+	if (rc = chidb_Btree_open(file, *db, &(*db)->bt))
+		return rc;
 
-    // initialize list of schema structs
-    list_init(&(*db)->schemas);
+	// initialize list of schema structs
+	list_init(&(*db)->schemas);
 
-    if(st = load_schema(*db, 1)))
-        return st;
+	if(rc = load_schema(*db, 1))
+		return rc;
 
-    (*db)->need_refresh = 0;
-    //print_schema_list((*db)->schemas);
+	(*db)->need_refresh = 0;
+	//print_schema_list((*db)->schemas);
 
-		return CHIDB_OK;
+	return CHIDB_OK;
 }
 
 int chidb_close(chidb *db)
