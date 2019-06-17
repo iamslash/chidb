@@ -47,6 +47,7 @@
 #include "btree.h"
 #include "record.h"
 #include "util.h"
+#include "../simclist/simclist.h"
 
 /* Implemented in codegen.c */
 int chidb_stmt_codegen(chidb_stmt *stmt, chisql_statement_t *sql_stmt);
@@ -56,25 +57,105 @@ int chidb_stmt_optimize(chidb *db,
 			chisql_statement_t *sql_stmt, 
 			chisql_statement_t **sql_stmt_opt);
 
-  /* your code */
+int load_schema(chidb *db, npage_t nroot)
+{
+	BTree *bt = db->bt;
+
+	BTreeNode *btn;
+
+	int i;
+	int st;
+
+	// get BTree Node
+	if (st = chidb_Btree_getNodeByPage(bt, nroot, &btn))
+		return st;
+	for (i = 0; i < btn->n_cells; i++) {
+		BTreeCell *cell = malloc(sizeof(BTreeCell));
+		
+		if(chidb_Btree_getCell(btn, i, cell))
+			return CHIDB_ECELLNO;
+
+		// if we are at an internal node
+		if (btn->type == PGTYPE_TABLE_INTERNAL) {
+			return load_schema(db, cell->fields.tableInternal.child_page);
+		} 
+		
+		if (btn->type == PGTYPE_TABLE_LEAF) {
+			DBRecord *dbr;
+			char *sql;
+			chidb_DBRecord_unpack(&dbr, cell->fields.tableLeaf.data);
+
+			chidb_sql_schema_t *schema = malloc(sizeof(chidb_sql_schema_t));
+			
+			chidb_DBRecord_getString(dbr, 0, &(schema)->type);
+			chidb_DBRecord_getString(dbr, 1, &(schema)->name);
+			chidb_DBRecord_getString(dbr, 2, &(schema)->assoc);
+			chidb_DBRecord_getInt32(dbr, 3, &(schema)->rpage);
+			chidb_DBRecord_getString(dbr, 4, &sql);
+
+			chisql_statement_t *stmt;
+			chisql_parser(sql, &stmt);
+
+			schema->stmt = stmt;
+
+			list_append(&db->schemas, schema);
+
+			free(sql);
+			chidb_DBRecord_destroy(dbr);
+		}
+
+		free(cell);
+	}
+
+	// If we are at an internal node, traverse right page
+	if (btn->type != PGTYPE_TABLE_LEAF) {
+		i = btn->right_page;
+		return load_schema(db, i);
+	}
+
+	chidb_Btree_freeMemNode(bt, btn);
+
+	return CHIDB_OK;
+}
 
 int chidb_open(const char *file, chidb **db)
 {
     *db = malloc(sizeof(chidb));
     if (*db == NULL)
-        return CHIDB_ENOMEM;
-    chidb_Btree_open(file, *db, &(*db)->bt);
+      return CHIDB_ENOMEM;
 
-    /* Additional initialization code goes here */
-    return CHIDB_OK;
+    if (st = chidb_Btree_open(file, *db, &(*db)->bt))
+	    return st;
+
+    // initialize list of schema structs
+    list_init(&(*db)->schemas);
+
+    if(st = load_schema(*db, 1)))
+        return st;
+
+    (*db)->need_refresh = 0;
+    //print_schema_list((*db)->schemas);
+
+		return CHIDB_OK;
 }
 
 int chidb_close(chidb *db)
 {
     chidb_Btree_close(db->bt);
-    free(db);
 
-    /* Additional cleanup code goes here */
+    while(!list_empty(&db->schemas))
+    {
+    	chidb_sql_schema_t *next = (chidb_sql_schema_t *) list_fetch(&db->schemas);
+    	chisql_statement_free(next->stmt);
+    	free(next->type);
+    	free(next->name);
+    	free(next->assoc);
+    	free(next);
+    }
+
+    list_destroy(&db->schemas);
+
+    free(db);
 
     return CHIDB_OK;
 }

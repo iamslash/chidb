@@ -62,6 +62,16 @@
 #define CHIDB_EEMPTY (9)
 #define CHIDB_EPARSE (10)
 
+// additional codes
+#define CHIDB_ETYPE (11) // invalid type in switch stmt
+#define CHIDB_ENOREG (37) //Error accessing register
+
+#define CHIDB_CURSORCANTMOVE (40)
+#define CHIDB_PROBLEM (500)
+#define CHIDB_TRUE (1000)
+#define CHIDB_FALSE (-1000)
+#define CHIDB_DELETE (666)
+#define CHIDB_EQUIT (8000)  // when user typed .quit in the shell
 
 #define DEFAULT_PAGE_SIZE (1024)
 

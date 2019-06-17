@@ -93,6 +93,7 @@ int main(int argc, char *argv[])
     else
     {
         HistEvent ev;
+        int st;
 
         /* Initialize EditLine */
         el = el_init(argv[0], stdin, stdout, stderr);
@@ -136,12 +137,19 @@ int main(int argc, char *argv[])
 
                 history(hist, &ev, H_ENTER, cmd2); // Add to history
 
-                chidb_shell_handle_cmd(&shell_ctx, cmd2);
+                st = chidb_shell_handle_cmd(&shell_ctx, cmd2);
                 free(cmd2);
             }
 
-        }
+            if (st == CHIDB_EQUIT)
+            {
+                free(shell_ctx.dbfile);
+                history_end(hist);
+                el_end(el);
 
+                return 0;
+            }            
+        }
 
         history_end(hist);
         el_end(el);

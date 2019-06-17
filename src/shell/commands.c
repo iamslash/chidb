@@ -5,7 +5,7 @@
 #include "commands.h"
 #include <chisql/chisql.h>
 #include <chidb/utils.h>
-
+#include "../libchidb/util.h"
 
 #define COL_SEPARATOR "|"
 
@@ -21,7 +21,8 @@ struct handler_entry handlers[] =
     		                  "                     list    Values delimited by | (default)"),
     HANDLER_ENTRY (explain,   ".explain on|off    Turn output mode suitable for EXPLAIN on or off."),
     HANDLER_ENTRY (help,      ".help              Show this message"),
-
+    HANDLER_ENTRY (schema,    ".schema            show database schema list"),
+    HANDLER_ENTRY (quit,      ".quit              quit shell"),
     NULL_ENTRY
 };
 
@@ -454,3 +455,18 @@ int chidb_shell_handle_cmd_help(chidb_shell_ctx_t *ctx, struct handler_entry *e,
     return CHIDB_OK;
 }
 
+// load schema
+int chidb_shell_handle_cmd_schema(chidb_shell_ctx_t *ctx, struct handler_entry *e, const char **tokens, int ntokens)
+{
+    print_schema_list(ctx->db->schemas);
+
+    return CHIDB_OK;
+}
+
+// quit shell
+int chidb_shell_handle_cmd_quit(chidb_shell_ctx_t *ctx, struct handler_entry *e, const char **tokens, int ntokens)
+{
+    chidb_close(ctx->db);
+
+    return CHIDB_EQUIT;
+}
