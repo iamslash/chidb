@@ -18,8 +18,8 @@ ToDo
 * src/libchidb/dbm.c
 * src/libchidb/dbm.h
 * src/libchidb/optimizer.c
-* src/libchidb/util.c
-* src/libchidb/util.h
+* //src/libchidb/util.c
+* //src/libchidb/util.h
 
 * src/libchisql/sql.y
 

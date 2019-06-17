@@ -43,6 +43,7 @@
 #include "chidbInt.h"
 #include "btree.h"
 #include <chidb/utils.h>
+#include "../simclist/simclist.h"
 
 /*
 ** Read or write a two- and four-byte big-endian integer values.
@@ -67,6 +68,27 @@ void chidb_BTree_recordPrinter(BTreeNode *btn, BTreeCell *btc);
 void chidb_BTree_stringPrinter(BTreeNode *btn, BTreeCell *btc);
 
 FILE *copy(const char *from, const char *to);
+
+int chidb_table_exists(list_t s, char *table);
+int chidb_get_root(list_t s, char *table);
+int chidb_column_exists(list_t s, char *table, char *column);
+int chidb_column_get_type(list_t s, char *table, char *column);
+int chidb_column_names(list_t s, char *table, list_t *names);
+int chidb_columns_total(list_t schemas, char *table);
+void print_schema_list(list_t schemas);
+int chidb_column_position(list_t *names, char *col_name);
+
+int chidb_get_tables(list_t tables, chisql_statement_t *sql_statement);
+int chidb_get_sra_tables(list_t tables, SRA_t *s);
+int chidb_get_select_columns(list_t column_names, Expression_t *exp_list);
+int chidb_columns_in_same_table(list_t s, list_t tables, list_t found_tables, char *col1, char *col2);
+int chidb_get_where_tables(list_t tables, Condition_t *cond);
+int chidb_get_where_columns(list_t column_names, Condition_t *cond);
+// int chidb_get_where_conds(list_t conds, SRA_t *s);
+
+int nameSeeker(const void *entry, const void *name);
+
+void chisql_statement_free(chisql_statement_t *sql);
 
 
 #endif /*UTIL_H_*/
