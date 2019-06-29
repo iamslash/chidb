@@ -676,3 +676,32 @@ int chidb_column_position(list_t *names, char *col_name)
 
     return (i == list_size(names)) ? (-1) : (i);
 }
+
+void chisql_statement_free(chisql_statement_t *sql)
+{
+    switch (sql->type)
+    {
+        case STMT_CREATE:
+        {
+            Create_free(sql->stmt.create);
+        } break;
+
+        case STMT_SELECT:
+        {
+            SRA_free(sql->stmt.select);
+        } break;
+
+        case STMT_INSERT:
+        {
+            Insert_free(sql->stmt.insert);
+        } break;
+
+        case STMT_DELETE:
+        {
+            Delete_free(sql->stmt.delete);
+        } break;
+    }
+
+    free(sql->text);
+    free(sql);
+}
