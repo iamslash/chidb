@@ -517,7 +517,7 @@ int chidb_Btree_insertCell(BTreeNode* btn, ncell_t ncell, BTreeCell* cell)
   uint8_t hexg[] = {0x0B, 0x03, 0x04, 0x04};
 
   if(ncell < 0 || ncell > btn->n_cells) {
-    eturn CHIDB_ECELLNO;
+    return CHIDB_ECELLNO;
   }
 
   switch(btn->type) {
